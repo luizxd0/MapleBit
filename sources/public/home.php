@@ -31,4 +31,4 @@ $(document).ready(function() {
 <?php
 	$editable = " id=\"home\" contenteditable=\"true\">";
 }
-echo "<hr/><div" . $editable . $gethome['homecontent'] . "</div>";
+echo "<section class=\"home-welcome\"><div" . $editable . $gethome['homecontent'] . "</div></section>";

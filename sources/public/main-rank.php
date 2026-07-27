@@ -1,61 +1,58 @@
 <?php
-if(basename($_SERVER["PHP_SELF"]) == "main-rank.php") {
-	die("403 - Access Forbidden");
-}
-if($servertype == 1) {
-	$first = "reborns";
-	$second = "level";
-}
-else {
-	$first = "level";
-	$second = "exp";
+if (basename($_SERVER['PHP_SELF']) === 'main-rank.php') {
+    http_response_code(403);
+    exit('403 - Access Forbidden');
 }
 
-echo "
-	<div class=\"col-md-6\">
-	<a href='?base=main&amp;page=rankings'><h5>Rankings &raquo;</h5></a><hr/>
-";
-$gc = $mysqli->query("SELECT c.$first, c.$second, c.name, c.accountid FROM characters c LEFT JOIN accounts a ON c.accountid = a.id WHERE c.gm < '$gmlevel' AND COALESCE(a.banned, 0) = 0 ORDER BY c.$first DESC, c.$second DESC LIMIT 5");
-if($gc->num_rows) {
-	echo "
-		<table class=\"table table-condensed\">
-			<thead>
-				<tr>
-					<th>Avatar</th>
-					<th>Name</th>
-					<th>".ucfirst($first)."</th>
-				</tr>
-			</thead>
-			<tbody>
-				<tr>
-					<td rowspan=\"6\">
-	";
-	$p = 0;
-	while($player = $gc->fetch_assoc() and $p <=5) {
-		$char = $player['accountid'];
-		$name = $player['name'];
-		$p++;
-		if ($p == 1) {
-			echo "
-				<img src=\"assets/img/GD/create.php?name=".$name."\" alt='".$name."' id=\"top5\" class=\"rank_img\"/>
-				</td>
-			";
-		}
-		echo "
-			<tr>
-				<td>
-					<a href=\"?base=main&amp;page=character&amp;n=".$name."\" onmouseover=\"roll('top5', 'assets/img/GD/Characters/".$name.".png')\" id=\"".$name."\">".$name."</a>
-				</td>
-				<td>".$player[$first]."</td>
-			</tr>
-		";
-	}
-	echo "
-		</tbody>
-		</table>
-	";
+if ($servertype == 1) {
+    $first = 'reborns';
+    $second = 'level';
+} else {
+    $first = 'level';
+    $second = 'exp';
 }
-else {
-	echo "<div class=\"alert alert-info\">No characters found.</div>";
-}
-echo "<hr/></div>";
+
+$rankingResult = $mysqli->query(
+    "SELECT c.{$first}, c.{$second}, c.name, c.accountid "
+    . 'FROM characters c LEFT JOIN accounts a ON c.accountid = a.id '
+    . "WHERE c.gm < '{$gmlevel}' AND COALESCE(a.banned, 0) = 0 "
+    . "ORDER BY c.{$first} DESC, c.{$second} DESC LIMIT 5"
+);
+$players = $rankingResult ? $rankingResult->fetch_all(MYSQLI_ASSOC) : [];
+?>
+<section class="home-widget ranking-widget">
+    <div class="widget-heading">
+        <span class="widget-icon rank-icon"><i class="fa fa-trophy" aria-hidden="true"></i></span>
+        <div><small>Hall of fame</small><h3>Top Maplers</h3></div>
+        <a href="?base=main&amp;page=rankings">Full rankings <i class="fa fa-angle-right" aria-hidden="true"></i></a>
+    </div>
+    <?php if ($players): ?>
+        <?php $leaderName = $players[0]['name']; ?>
+        <div class="ranking-showcase">
+            <div class="ranking-leader">
+                <span class="leader-crown"><i class="fa fa-star" aria-hidden="true"></i> #1</span>
+                <img src="assets/img/GD/create.php?name=<?php echo rawurlencode($leaderName); ?>"
+                     alt="<?php echo htmlspecialchars($leaderName, ENT_QUOTES, 'UTF-8'); ?>"
+                     id="top5" class="rank_img">
+                <strong><?php echo htmlspecialchars($leaderName, ENT_QUOTES, 'UTF-8'); ?></strong>
+                <small><?php echo ucfirst($first); ?> <?php echo number_format((int) $players[0][$first]); ?></small>
+            </div>
+            <ol class="ranking-list">
+                <?php foreach ($players as $position => $player): ?>
+                    <?php $playerName = $player['name']; ?>
+                    <li>
+                        <span class="rank-position"><?php echo $position + 1; ?></span>
+                        <a href="?base=main&amp;page=character&amp;n=<?php echo rawurlencode($playerName); ?>"
+                           onmouseover="roll('top5', 'assets/img/GD/Characters/<?php echo rawurlencode($playerName); ?>.png')">
+                            <?php echo htmlspecialchars($playerName, ENT_QUOTES, 'UTF-8'); ?>
+                        </a>
+                        <span><small><?php echo ucfirst($first); ?></small>
+                            <strong><?php echo number_format((int) $player[$first]); ?></strong></span>
+                    </li>
+                <?php endforeach; ?>
+            </ol>
+        </div>
+    <?php else: ?>
+        <div class="widget-list"><div class="alert alert-info">No characters found.</div></div>
+    <?php endif; ?>
+</section>

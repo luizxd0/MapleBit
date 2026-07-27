@@ -12,14 +12,17 @@ if($getbase === "main") {
 	if(empty($main)) {
 		$queryhome = $mysqli->query("SELECT homecontent FROM ".$prefix."properties");
 		$gethome = $queryhome->fetch_assoc();
-		echo "<div class=\"row\">";
+		echo '<div class="home-intro">'
+			. '<span>Welcome to Maple World</span>'
+			. '<h2>Your adventure starts here</h2>'
+			. '<p>Catch up on the world, meet the community, and see who is climbing the ranks.</p>'
+			. '</div>';
+		echo "<div class=\"home-grid\">";
 		include ("sources/public/main-news.php");
 		include ("sources/public/main-events.php");
-		echo "</div>";
-		echo "<br/><div class=\"row\">";
 		include ("sources/public/main-rank.php");
 		include ("sources/public/main-gm.php");
-		echo "</div><br/>";
+		echo "</div>";
 		include ("sources/public/home.php");
 	}
 	elseif($main === "download") {
