@@ -140,7 +140,7 @@ $mysqli = new MySQLi($host[\'hostname\'],$host[\'user\'],$host[\'password\'],$ho
 			<br/><br/>';
 		break;
 		case 3:
-			include '../database.php';
+			include_once __DIR__ . '/../database.php';
     		if($mysqli->query("SHOW TABLES LIKE 'accounts'")->num_rows != 1) {
 				echo "<hr/><div class=\"alert alert-danger\">(1) You need to have a valid game database installed before installing MapleBit!</div><hr/><a href=\"?install=1\" class=\"btn btn-danger btn-lg\" value=\"Continue &raquo;\" style=\"float:right\">&laquo; Go Back</a><br/><br/>";
 				exit();
@@ -149,30 +149,33 @@ $mysqli = new MySQLi($host[\'hostname\'],$host[\'user\'],$host[\'password\'],$ho
 				echo "<hr/><div class=\"alert alert-danger\">(2) You need to have a valid game database installed before installing MapleBit!</div><hr/><a href=\"?install=1\" class=\"btn btn-danger btn-lg\" value=\"Continue &raquo;\" style=\"float:right\">&laquo; Go Back</a><br/><br/>";
 				exit();
     		}
-$queryaccounts = $mysqli->query("SELECT * FROM `accounts`");
-$getcolumns = $queryaccounts->fetch_assoc();
+$queryaccounts = $mysqli->query("SHOW COLUMNS FROM `accounts`");
+$getcolumns = array();
+while ($column = $queryaccounts->fetch_assoc()) {
+	$getcolumns[$column['Field']] = true;
+}
 
-if(!isset($getcolumns['webadmin'])) {
+if(!array_key_exists('webadmin', $getcolumns)) {
 	$mysqli->query("ALTER TABLE accounts ADD `webadmin` int(1) DEFAULT 0;");
 	echo "Added webadmin<br/>";
 }
-if(!isset($getcolumns['nick'])) {
+if(!array_key_exists('nick', $getcolumns)) {
 	$mysqli->query("ALTER TABLE accounts ADD `nick` varchar(20);");
 	echo "Added nick<br/>";
 }
-if(!isset($getcolumns['mute'])) {
+if(!array_key_exists('mute', $getcolumns)) {
 	$mysqli->query("ALTER TABLE accounts ADD `mute` int(1) DEFAULT 0;");
 	echo "Added mute<br/>";
 }
-if(!isset($getcolumns['email'])) {
+if(!array_key_exists('email', $getcolumns)) {
 	$mysqli->query("ALTER TABLE accounts ADD `email` VARCHAR(45) DEFAULT NULL;");
 	echo "Added email<br/>";
 }
-if(!isset($getcolumns['ip'])) {
+if(!array_key_exists('ip', $getcolumns)) {
 	$mysqli->query("ALTER TABLE accounts ADD `ip` text;");
 	echo "Added ip<br/>";
 }
-if(!isset($getcolumns['birthday'])) {
+if(!array_key_exists('birthday', $getcolumns)) {
 	$mysqli->query("ALTER TABLE accounts ADD `birthday` DATE;");
 	echo "Added birthday<br/>";
 }
@@ -366,7 +369,7 @@ CREATE TABLE `".$prefix."votingrecords` (
 echo "<META http-equiv=\"refresh\" content=\"0;URL=?install=4\">";
 		break;
 		case 4:
-		include('../database.php');
+		include_once __DIR__ . '/../database.php';
 			if(isset($_POST['submit'])) {
 				$sservername = $mysqli->real_escape_string(stripslashes($_POST['servername']));
 				$sclient = $mysqli->real_escape_string(stripslashes($_POST['client']));
@@ -514,7 +517,7 @@ echo "<META http-equiv=\"refresh\" content=\"0;URL=?install=4\">";
 			}
 		break;
 		case 6:
-			include('../database.php');
+			include_once __DIR__ . '/../database.php';
 			echo '<h5 class="card-title">Create Administrator Account</h5><hr/>';
 			if(!isset($_POST['submit'])) {
 				$_SESSION['flash'] = "";

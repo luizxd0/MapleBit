@@ -1,5 +1,23 @@
-<?php 
+<?php
+$usingHttps = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+ini_set('session.use_strict_mode', '1');
+ini_set('session.use_only_cookies', '1');
+session_set_cookie_params([
+	'httponly' => true,
+	'secure' => $usingHttps,
+	'samesite' => 'Lax',
+	'path' => '/',
+]);
 session_start();
+
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header("Permissions-Policy: camera=(), microphone=(), geolocation=()");
+
+if (empty($_SESSION['csrf_token'])) {
+	$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 # Disable Notices
 
 # Is MapleBit installed?
@@ -17,6 +35,8 @@ if(!file_exists('assets/config/install/installdone.txt')) {
 	# Define $getbase variable
 	$getbase = isset($_GET['base']) ? $_GET['base'] : "";
 
+	$slugs = [];
+	$slugarray = [];
 	$getslug = $mysqli->query("SELECT slug, title, visible from ".$prefix."pages");
 	while($fetchslug = $getslug->fetch_assoc()) {
 		$slugs[] = $fetchslug['slug'];

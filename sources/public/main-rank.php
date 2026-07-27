@@ -15,7 +15,7 @@ echo "
 	<div class=\"col-md-6\">
 	<a href='?base=main&amp;page=rankings'><h5>Rankings &raquo;</h5></a><hr/>
 ";
-$gc = $mysqli->query("SELECT c.$first , c.$second, c.name, c.accountid, a.banned AS banned FROM characters c LEFT JOIN accounts a ON c.accountid = a.id WHERE c.gm < '$gmlevel' AND banned = 0 GROUP BY c.id DESC ORDER BY $first DESC, $second DESC LIMIT 5");
+$gc = $mysqli->query("SELECT c.$first, c.$second, c.name, c.accountid FROM characters c LEFT JOIN accounts a ON c.accountid = a.id WHERE c.gm < '$gmlevel' AND COALESCE(a.banned, 0) = 0 ORDER BY c.$first DESC, c.$second DESC LIMIT 5");
 if($gc->num_rows) {
 	echo "
 		<table class=\"table table-condensed\">

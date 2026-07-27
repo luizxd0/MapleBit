@@ -2,6 +2,24 @@ MapleBit
 ============
 Please note that this is not mine, i just grabbed MapleBit v1.20 and added bcrypt support to ensure there is a stable version where character pictures display properly, and registration/account login works.
 
+SoloMapling local setup
+============
+This fork includes a Windows development setup for the Cosmic-compatible
+SoloMapling server in `C:\MapleServer`.
+
+```powershell
+.\Install-MapleWeb.ps1
+.\Start-MapleWeb.ps1
+```
+
+The site listens on `http://127.0.0.1:8080/` by default. Database credentials
+are read at runtime from `C:\MapleServer\config.yaml`; they are not stored in
+this repository. Use `.\Start-MapleWeb.ps1 -Background` to start it in the
+background and `.\Stop-MapleWeb.ps1` to stop that background process.
+
+Local development mode bypasses reCAPTCHA only for loopback requests. Configure
+real reCAPTCHA keys and disable `MAPLE_LOCAL_DEV` before publishing the site.
+
 Installation
 ============
 To install the CMS, you need to upload the entire .zip to your web server. Then, extract the .zip, and open your browser. Navigate to the location in which you extracted the .zip. You'll be presented with a web based installer. Next, enter in your database connection details, and configure your website. Once you've done this, the installer will lock itself and redirect you to your website. 

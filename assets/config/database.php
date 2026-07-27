@@ -1,21 +1,42 @@
 <?php
-if(basename($_SERVER["PHP_SELF"]) == "database.php") {
+if (basename($_SERVER["PHP_SELF"] ?? "") === "database.php") {
+    http_response_code(403);
     die("403 - Access Forbidden");
 }
-//SQL Information
-$host['hostname'] = 'localhost'; // Hostname [Usually locahost]
-$host['user'] = 'root'; // Database Username [Usually root]
-$host['password'] = ''; // Database Password [Leave blank if unsure]
-$host['database'] = 'mapleblade'; // Database Name
 
-//Database Prefix
-$prefix = "bit_";
-// What is your server`s log in port - Don`t change if you aren`t sure.
-$loginport = "7575";
-// What is your server`s world port - Don`t change if you aren`t sure.
-$worldport = "8484";
+function maple_env(string $name, ?string $default = null): string {
+    $value = getenv($name);
+    if ($value === false || $value === "") {
+        if ($default !== null) {
+            return $default;
+        }
+        throw new RuntimeException("Required environment variable {$name} is not configured.");
+    }
+    return $value;
+}
 
-/* Don`t touch. */
-$mysqli = new MySQLi($host['hostname'],$host['user'],$host['password'],$host['database']);
+$host = [
+    'hostname' => maple_env('MAPLE_DB_HOST', '127.0.0.1'),
+    'user' => maple_env('MAPLE_DB_USER'),
+    'password' => maple_env('MAPLE_DB_PASS', ''),
+    'database' => maple_env('MAPLE_DB_NAME', 'cosmic'),
+    'port' => (int) maple_env('MAPLE_DB_PORT', '3306'),
+];
 
-?>
+$prefix = maple_env('MAPLE_DB_PREFIX', 'bit_');
+if (!preg_match('/^[A-Za-z0-9_]+$/', $prefix)) {
+    throw new RuntimeException('MAPLE_DB_PREFIX may only contain letters, numbers, and underscores.');
+}
+
+$loginport = maple_env('MAPLE_LOGIN_PORT', '8484');
+$worldport = maple_env('MAPLE_CHANNEL_PORT', '7575');
+
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+$mysqli = new mysqli(
+    $host['hostname'],
+    $host['user'],
+    $host['password'],
+    $host['database'],
+    $host['port']
+);
+$mysqli->set_charset('utf8mb4');

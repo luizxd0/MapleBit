@@ -1,78 +1,118 @@
 <?php
-if(basename($_SERVER["PHP_SELF"]) == "register.php") {
-	die("403 - Access Forbidden");
+if (basename($_SERVER["PHP_SELF"] ?? "") === "register.php") {
+    http_response_code(403);
+    die("403 - Access Forbidden");
 }
-require "assets/libs/recaptcha/autoload.php";
-require "assets/libs/gump.class.php";
 
-if($recaptcha_public == null || $recaptcha_private == null) {
-	echo '<div class="alert alert-danger">Your administrator has not setup reCATPCHA yet!</div>';
-	return;
+if (isset($_SESSION['id'])) {
+    echo '<meta http-equiv="refresh" content="0; url=?base=ucp">';
+    return;
 }
-GUMP::add_validator("recaptcha", function($field, $input, $param = NULL) use ($recaptcha_private) {
-	$recaptcha = new \ReCaptcha\ReCaptcha($recaptcha_private);
-	$resp = $recaptcha->verify($input['g-recaptcha-response'], $_SERVER["REMOTE_ADDR"]);
-	return $resp->isSuccess();
-});
 
-GUMP::add_validator("exists", function($field, $input, $param = NULL) use ($mysqli) {
-	return $mysqli->query("SELECT COUNT(*) FROM accounts WHERE $param ='".$mysqli->real_escape_string($input[$field])."'")->fetch_row()[0] == 0;
-});
+$remoteAddress = $_SERVER['REMOTE_ADDR'] ?? '';
+$localDevelopment = getenv('MAPLE_LOCAL_DEV') === '1'
+    && in_array($remoteAddress, ['127.0.0.1', '::1'], true);
+$captchaConfigured = !empty($recaptcha_public) && !empty($recaptcha_private);
+$registrationErrors = [];
+$registrationComplete = false;
 
-if(isset($_SESSION['id'])) {
-    echo "<meta http-equiv=refresh content=\"0; url=?base=ucp\">";
+if (!$localDevelopment && !$captchaConfigured) {
+    echo '<div class="alert alert-danger">Registration is disabled until reCAPTCHA is configured.</div>';
     return;
 }
 
 if (isset($_POST['submit'])) {
-	$gump = new GUMP();
-	$_POST = $gump->sanitize($_POST);
-	$gump->validation_rules(array(
-    	'username' => 'required|alpha_numeric|exists,name|max_len,12|min_len,4',
-    	'password' => 'required|min_len,6',
-    	'email' => 'required|valid_email|exists,email',
-    	'g-recaptcha-response' => 'required|recaptcha',
-	));
-	$gump->filter_rules(array(
-	    'username' => 'trim|sanitize_string',
-	    'password' => 'trim',
-	    'email'    => 'trim|sanitize_email',
-	));
-	GUMP::set_field_name("g-recaptcha-response", "reCAPTCHA");
-	$validated_data = $gump->run($_POST);
+    $username = trim((string) ($_POST['username'] ?? ''));
+    $password = (string) ($_POST['password'] ?? '');
+    $email = trim((string) ($_POST['email'] ?? ''));
+    $csrfToken = (string) ($_POST['csrf_token'] ?? '');
 
-	if($validated_data === false) {
-		echo '<div class="alert alert-danger">';
-		foreach($gump->get_errors_array() as $error) {
-			echo $error . '<br/>';
-		}
-		echo '</div>';
-	} else {
-		// Hash the password using bcrypt
-		$hashed_password = password_hash($validated_data['password'], PASSWORD_DEFAULT);
-		$insert_user_query = "INSERT INTO accounts (`name`, `password`, `ip`, `email`, `birthday`) VALUES ('".$validated_data['username']."', '".$hashed_password."', '".getRealIpAddr()."', '".$validated_data['email']."', '1990-01-01')";
-		$mysqli->query($insert_user_query);
-		echo '<div class="alert alert-success"><b>Success!</b> Please login, and head to the downloads page to get started!</div><script>$(function() {$("#register").fadeOut();});</script>';
-	}
+    if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $csrfToken)) {
+        $registrationErrors[] = 'Your session expired. Reload the page and try again.';
+    }
+    if (!preg_match('/^[A-Za-z0-9]{4,13}$/', $username)) {
+        $registrationErrors[] = 'Username must contain 4-13 letters or numbers.';
+    }
+    if (strlen($password) < 8 || strlen($password) > 72) {
+        $registrationErrors[] = 'Password must contain 8-72 characters.';
+    }
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 45) {
+        $registrationErrors[] = 'Enter a valid email address of at most 45 characters.';
+    }
+
+    if (!$localDevelopment && $captchaConfigured) {
+        require_once "assets/libs/recaptcha/autoload.php";
+        $recaptcha = new \ReCaptcha\ReCaptcha($recaptcha_private);
+        $captchaResponse = $recaptcha->verify(
+            (string) ($_POST['g-recaptcha-response'] ?? ''),
+            $remoteAddress
+        );
+        if (!$captchaResponse->isSuccess()) {
+            $registrationErrors[] = 'reCAPTCHA verification failed.';
+        }
+    }
+
+    if (!$registrationErrors) {
+        $duplicate = $mysqli->prepare(
+            'SELECT name, email FROM accounts WHERE name = ? OR email = ? LIMIT 1'
+        );
+        $duplicate->bind_param('ss', $username, $email);
+        $duplicate->execute();
+        $existing = $duplicate->get_result()->fetch_assoc();
+        if ($existing) {
+            $registrationErrors[] = strcasecmp($existing['name'], $username) === 0
+                ? 'That username is already registered.'
+                : 'That email address is already registered.';
+        }
+    }
+
+    if (!$registrationErrors) {
+        $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
+        $ipAddress = getRealIpAddr();
+        $birthday = '1990-01-01';
+        $insert = $mysqli->prepare(
+            'INSERT INTO accounts (name, password, ip, email, birthday) VALUES (?, ?, ?, ?, ?)'
+        );
+        $insert->bind_param('sssss', $username, $hashedPassword, $ipAddress, $email, $birthday);
+        $insert->execute();
+        $registrationComplete = true;
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+}
+
+if ($registrationErrors) {
+    echo '<div class="alert alert-danger">';
+    foreach ($registrationErrors as $error) {
+        echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . '<br>';
+    }
+    echo '</div>';
+}
+
+if ($registrationComplete) {
+    echo '<div class="alert alert-success"><b>Success!</b> Your account is ready. You can now sign in here or in the v83 client.</div>';
+    return;
 }
 ?>
 <h2 class="text-left">Registration</h2><hr/>
+<?php if ($localDevelopment): ?>
+    <div class="alert alert-info">Local development mode: reCAPTCHA is bypassed only for loopback requests.</div>
+<?php endif; ?>
 <form action="?base=main&amp;page=register" method="POST" id="register">
-	<div class="form-group">
-		<label for="inputUsername">Username</label>
-		<input type="text" name="username" maxlength="12" class="form-control" id="inputUsername" autocomplete="off" placeholder="Username" value="<?php echo isset($_POST['username']) ? $_POST['username'] : '' ?>" required>
-	</div>
-	<div class="form-group">
-		<label for="inputPassword">Password</label>
-		<input type="password" name="password" maxlength="100" class="form-control" id="inputPassword" autocomplete="off" placeholder="Password" value="<?php echo isset($_POST['password']) ? $_POST['password'] : '' ?>" required>
-	</div>
-	<div class="form-group">
-		<label for="inputEmail">Email</label>
-		<input type="email" name="email" class="form-control" id="inputEmail" autocomplete="off" placeholder="Email" value="<?php echo isset($_POST['email']) ? $_POST['email'] : '' ?>" required>
-	</div>
-	<b>reCAPTCHA</b>
-	<div class="g-recaptcha" data-sitekey="<?php echo $recaptcha_public; ?>"></div>
-	<br/>
-	<input type="submit" class="btn btn-primary" name="submit" value="Register &raquo;">
+    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8'); ?>">
+    <div class="form-group">
+        <label for="inputUsername">Username</label>
+        <input type="text" name="username" maxlength="13" class="form-control" id="inputUsername" autocomplete="username" placeholder="Username" value="<?php echo htmlspecialchars($_POST['username'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" required>
+    </div>
+    <div class="form-group">
+        <label for="inputPassword">Password</label>
+        <input type="password" name="password" maxlength="72" class="form-control" id="inputPassword" autocomplete="new-password" placeholder="Password" required>
+    </div>
+    <div class="form-group">
+        <label for="inputEmail">Email</label>
+        <input type="email" name="email" maxlength="45" class="form-control" id="inputEmail" autocomplete="email" placeholder="Email" value="<?php echo htmlspecialchars($_POST['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" required>
+    </div>
+    <?php if (!$localDevelopment && $captchaConfigured): ?>
+        <div class="g-recaptcha" data-sitekey="<?php echo htmlspecialchars($recaptcha_public, ENT_QUOTES, 'UTF-8'); ?>"></div><br/>
+    <?php endif; ?>
+    <input type="submit" class="btn btn-primary" name="submit" value="Register &raquo;">
 </form>
-

@@ -8,6 +8,7 @@ $(function () {
         form_data = {
             username: $("#username").val(),
             password: $("#password").val(),
+            csrf_token: $("#login_csrf_token").val(),
             is_ajax: '1'
         };
         $('#login').keypress(function (e) {
@@ -40,7 +41,6 @@ $(function () {
     				$("#password").prop("disabled", false);
                     $('#message').hide().html("<br/><div class=\"alert alert-danger\">Wrong username or password</div>").fadeIn('fast');
                 }
-                console.log(response);
             }
         });
         return false;

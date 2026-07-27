@@ -34,6 +34,7 @@ if(isset($_SESSION['id'])) {
 ?>
 	<div class="card-body">
 		<form name="loginform" id="loginform" autocomplete="off">
+			<input type="hidden" id="login_csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8'); ?>"/>
 			<div class="form-group">
 				<input type="text" name="username" maxlength="12" class="form-control" placeholder="Username" id="username" required/>
 			</div>
