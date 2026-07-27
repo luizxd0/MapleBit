@@ -134,7 +134,7 @@ echo "
 					<td><span class=\"badge badge badge-secondary\">$ranking</span></td>
 					<td class=\"hidden-sm hidden-xs\">
 						<div class=\"text-center\">
-							<img src=\"".$siteurl."assets/img/GD/create.php?name=".$name."\" alt=\"".$name."\" class=\"avatar img-fluid\">
+							<img src=\"assets/img/GD/create.php?name=".rawurlencode($name)."\" alt=\"".htmlspecialchars($name, ENT_QUOTES, 'UTF-8')."\" class=\"avatar img-fluid\">
 						</div>
 					</td>
 					<td><a href=\"?base=main&page=character&n=".$row['name']."\">".$row['name']."</a></td>

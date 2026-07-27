@@ -17,7 +17,7 @@ if(isset($_GET['n'])) {
   						<div class=\"card-header\">".$c['name']."</div>
 						<div class=\"card-body\">
 							<div class=\"text-center\">
-								<img src=\"".$siteurl."assets/img/GD/create.php?name=".$c['name']."\" alt=\"".$c['name']."\" img-fluid\">
+								<img src=\"assets/img/GD/create.php?name=".rawurlencode($c['name'])."\" alt=\"".htmlspecialchars($c['name'], ENT_QUOTES, 'UTF-8')."\" class=\"character-render img-fluid\">
 							</div>
 							<hr/>
 							<b>Job:</b> " . htmlspecialchars($jobName, ENT_QUOTES, 'UTF-8') . "<br/>

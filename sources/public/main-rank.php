@@ -43,7 +43,7 @@ $players = $rankingResult ? $rankingResult->fetch_all(MYSQLI_ASSOC) : [];
                     <li>
                         <span class="rank-position"><?php echo $position + 1; ?></span>
                         <a href="?base=main&amp;page=character&amp;n=<?php echo rawurlencode($playerName); ?>"
-                           onmouseover="roll('top5', 'assets/img/GD/Characters/<?php echo rawurlencode($playerName); ?>.png')">
+                           onmouseover="roll('top5', 'assets/img/GD/create.php?name=<?php echo rawurlencode($playerName); ?>')">
                             <?php echo htmlspecialchars($playerName, ENT_QUOTES, 'UTF-8'); ?>
                         </a>
                         <span><small><?php echo ucfirst($first); ?></small>

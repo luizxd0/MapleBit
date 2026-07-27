@@ -17,6 +17,25 @@ class Character extends DOMDocument {
 	const mainX = 44;
 	const mainY = 34;
 	const neckY = 65;
+
+	public $image;
+	public $Skin;
+	public $Gender;
+	public $Hair;
+	public $Face;
+	public $Cap;
+	public $Mask;
+	public $Eyes;
+	public $Ears;
+	public $Coat;
+	public $Pants;
+	public $Shoes;
+	public $Glove;
+	public $Cape;
+	public $Shield;
+	public $Weapon;
+	public $stand = 1;
+	public $vSlot = '';
 	
 	//Default Gender Clothes
 	public $default = array(
@@ -25,9 +44,9 @@ class Character extends DOMDocument {
 	);
 	
 	function __construct() {
-		header('Pragma: public');
-		header('Cache-Control: max-age=86400');
-		header('Expires: '. gmdate('D, d M Y H:i:s \G\M\T', time() + 86400));
+		header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+		header('Pragma: no-cache');
+		header('Expires: 0');
 		header('Content-Type: image/png');
 		$this->image = ImageCreateTrueColor(96, 96);
 		ImageSaveAlpha($this->image, true);
@@ -110,8 +129,6 @@ class Character extends DOMDocument {
 		
 		if(isset($this->Hair['ID'])) {
 			$hair = "_".$z;
-			$hairX = self::mainX + $this->Hair['xml']->$hair->_stand1->x;
-			$hairY = self::mainY + $this->Hair['xml']->$hair->_stand1->y;
 			$vSlotArray = str_split($this->vSlot, 2);
 			
 			switch($z) {
@@ -312,7 +329,6 @@ class Character extends DOMDocument {
 			$snd    = "_stand".$this->stand;
 			$pantsX = self::mainX + $this->Pants['xml']->_pants->$snd->x;
 			$pantsY = self::neckY + $this->Pants['xml']->_pants->$snd->y;
-			imagettftext($this->image, 7, 0, 0, 90, $color, "C:\Windows\Fonts\Arial.ttf", $z);
 			if(self::exists("Pants/0".$this->Pants['ID'].".img/stand2.0.pants.png") && $this->stand == 2)
 				self::useImage("Pants/0".$this->Pants['ID'].".img/stand2.0.pants.png", $pantsX, $pantsY);
 			else
