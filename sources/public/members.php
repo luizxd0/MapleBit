@@ -3,10 +3,7 @@ if(basename($_SERVER["PHP_SELF"]) == "members.php") {
 	die("403 - Access Forbidden");
 }
 
-require_once 'assets/libs/HTMLPurifier.standalone.php';
-$config = HTMLPurifier_Config::createDefault();
-$config->set('HTML.Allowed', 'p, b, u, s, ol, li, ul, i, em, strong');
-$purifier = new HTMLPurifier($config);
+require_once 'assets/libs/maple_html.php';
 
 if(isset($_GET['name'])) {
 	$name = $mysqli->real_escape_string($_GET['name']);
@@ -29,7 +26,7 @@ if(isset($_GET['name'])) {
 	$gmc = $mysqli->query("SELECT * FROM `characters` WHERE `id`='".$mc."'") or die();
 	$m = $gmc->fetch_assoc();
 
-	$clean_html = $purifier->purify($p['text']);
+	$clean_html = maple_clean_html($p['text']);
 	if(empty($p['realname'])) {
 		$p['realname'] = "";
 	}

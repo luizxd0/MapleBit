@@ -2,7 +2,22 @@
 if(basename($_SERVER["PHP_SELF"]) == "sidebar.php") {
     die("403 - Access Forbidden");
 }
-$online = mysqli_fetch_assoc($mysqli->query("SELECT COUNT(*) AS o FROM accounts where loggedin = 2"));
+$databaseOnline = (int) mysqli_fetch_assoc(
+    $mysqli->query("SELECT COUNT(*) AS o FROM accounts WHERE loggedin = 2")
+)['o'];
+$onlinePlayers = $databaseOnline;
+$onlineBots = 0;
+$onlineTotal = $databaseOnline;
+$statusFile = getenv('MAPLE_SERVER_STATUS_FILE');
+if ($statusFile && is_readable($statusFile)) {
+    $serverStatus = json_decode((string) file_get_contents($statusFile), true);
+    $statusAge = time() - (int) ($serverStatus['updated_at'] ?? 0);
+    if (is_array($serverStatus) && $statusAge >= 0 && $statusAge <= 30) {
+        $onlinePlayers = max(0, (int) ($serverStatus['players'] ?? 0));
+        $onlineBots = max(0, (int) ($serverStatus['bots'] ?? 0));
+        $onlineTotal = $onlinePlayers + $onlineBots;
+    }
+}
 $accounts = mysqli_fetch_assoc($mysqli->query("SELECT COUNT(*) AS a FROM accounts"));
 $characters = mysqli_fetch_assoc($mysqli->query("SELECT COUNT(*) AS c FROM characters"));
 $links = "";
@@ -52,7 +67,8 @@ if(isset($_SESSION['id'])) {
 <div class="card mt-4 mb-4">
 	<div class="card-header">Server Info</div>
 	<div class="card-body">
-		Players Online: <b><?php echo $online['o'];?></b><br/>
+		Online: <b><?php echo $onlineTotal; ?></b>
+		<small>(<?php echo $onlinePlayers; ?> players + <?php echo $onlineBots; ?> bots)</small><br/>
 		Accounts: <b><?php echo $accounts['a'];?></b><br/>
 		Characters: <b><?php echo $characters['c'];?></b><br/>
 		<hr/>

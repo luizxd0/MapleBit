@@ -16,16 +16,8 @@ if(isset($_GET['id'])) {
 	$n = $gn->fetch_assoc();
 	if($gn->num_rows) {
 		$mysqli->query("UPDATE `".$prefix."news` SET `views` = views + 1 WHERE `id`='".$id."'");
-		require_once 'assets/libs/HTMLPurifier.standalone.php';
-		$config = HTMLPurifier_Config::createDefault();
-		$config->set('HTML.SafeIframe', true);
-		$config->set('HTML.TargetBlank', true);
-		$config->set('HTML.SafeObject', true);
-		$config->set('Output.FlashCompat', true);
-		$config->set('HTML.SafeEmbed', true);
-		$config->set('URI.SafeIframeRegexp', '%^(https?:)?//(www\.youtube(?:-nocookie)?\.com/embed/|player\.vimeo\.com/video/)%'); //allow YouTube and Vimeo
-		$purifier = new HTMLPurifier($config);
-		$clean_html = $purifier->purify($n['content']);
+		require_once 'assets/libs/maple_html.php';
+		$clean_html = maple_clean_html($n['content'], true);
 		$positive = 0;
 		$negative = 0;
 		$neutral = 0;

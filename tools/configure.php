@@ -72,6 +72,24 @@ $update->bind_param(
 );
 $update->execute();
 
+$packageCount = (int) $mysqli->query(
+    "SELECT COUNT(*) AS total FROM {$prefix}buynx"
+)->fetch_assoc()['total'];
+if ($packageCount === 0) {
+    $insertPackage = $mysqli->prepare(
+        "INSERT INTO {$prefix}buynx (meso, nx) VALUES (?, ?)"
+    );
+    foreach ([
+        [100000, 1000],
+        [500000, 5500],
+        [1000000, 12000],
+    ] as [$meso, $nx]) {
+        $insertPackage->bind_param('ii', $meso, $nx);
+        $insertPackage->execute();
+    }
+    $packageCount = 3;
+}
+
 $marker = $root . '/assets/config/install/installdone.txt';
 if (file_put_contents($marker, "Installed by tools/configure.php\n") === false) {
     throw new RuntimeException("Unable to create the installer lock file: {$marker}");
@@ -86,4 +104,5 @@ foreach (['accounts', 'characters'] as $table) {
 echo "MapleWeb configured successfully.\n";
 echo "Database: {$host['database']} on {$host['hostname']}:{$host['port']}\n";
 echo "Accounts: {$counts['accounts']}; Characters: {$counts['characters']}\n";
+echo "NX packages: {$packageCount}\n";
 

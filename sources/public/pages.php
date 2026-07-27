@@ -9,17 +9,8 @@ if($query->num_rows == 0) {
 }
 else {
 	$p = $query->fetch_assoc();
-	require_once 'assets/libs/HTMLPurifier.standalone.php';
-	$config = HTMLPurifier_Config::createDefault();
-	$config->set('HTML.SafeIframe', true);
-	$config->set('HTML.TargetBlank', true);
-	$config->set('HTML.SafeObject', true);
-	$config->set('Output.FlashCompat', true);
-	$config->set('HTML.SafeEmbed', true);
-	$config->set('HTML.Trusted', true);
-	$config->set('URI.SafeIframeRegexp', '%^(https?:)?//(www\.youtube(?:-nocookie)?\.com/embed/|player\.vimeo\.com/video/)%'); //allow YouTube and Vimeo
-	$purifier = new HTMLPurifier($config);
-	$clean_html = $purifier->purify($p['content']);
+	require_once 'assets/libs/maple_html.php';
+	$clean_html = maple_clean_html($p['content'], true);
 	echo "
 		<h2 class=\"text-left\">".$p['title']."</h2>
 		<hr/>

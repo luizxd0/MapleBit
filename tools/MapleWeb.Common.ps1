@@ -44,6 +44,7 @@ function Import-MapleWebEnvironment {
     $env:MAPLE_DB_PREFIX = 'bit_'
     $env:MAPLE_LOCAL_DEV = '1'
     $env:MAPLE_SITE_URL = "http://127.0.0.1:$Port/"
+    $env:MAPLE_SERVER_STATUS_FILE = Join-Path $ServerRoot 'runtime\server-status.json'
 }
 
 function Get-MaplePhpPath {

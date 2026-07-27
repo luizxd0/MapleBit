@@ -61,10 +61,7 @@ if(isset($_SESSION['id']) && isset($_SESSION['admin'])) {
 				$version_message = "Enable openssl by right clicking wamp, then PHP, and then scroll down to php_openssl";
 			}
 		}
-		require_once 'assets/libs/HTMLPurifier.standalone.php';
-		$commentconfig = HTMLPurifier_Config::createDefault();
-		$commentconfig->set('HTML.Allowed', '');
-		$commentpurifier = new HTMLPurifier($commentconfig);
+		require_once 'assets/libs/maple_html.php';
 ?>
 <h2 class="text-left">Admin Home</h2>
 <hr>
@@ -90,7 +87,7 @@ if(isset($_SESSION['id']) && isset($_SESSION['admin'])) {
 			if($getcomments->num_rows) {
 				echo '<ul class="list-group">';
 				while($comments = $getcomments->fetch_assoc()) {
-					$clean_comment = $commentpurifier->purify($comments['comment']);
+					$clean_comment = strip_tags(maple_clean_html($comments['comment']));
 					$clean_comment = (strlen($clean_comment) > 50) ? substr($clean_comment,0,50).'...' : $clean_comment;
 					if($comments['feedback'] == 0) {
 						$feedback = "<span class=\"positive_comment\">Positive</span>";

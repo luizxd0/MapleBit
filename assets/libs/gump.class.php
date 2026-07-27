@@ -307,7 +307,7 @@ public function sanitize(array $input, array $fields = array(), $utf8_encode = t
                 $value = $this->sanitize($value);
             }
             if (is_string($value)) {
-                $value = filter_var($value, FILTER_SANITIZE_STRING);
+                $value = $this->filter_sanitize_string($value);
             }
 
             $return[$field] = $value;
@@ -845,7 +845,7 @@ public function sanitize(array $input, array $fields = array(), $utf8_encode = t
      */
     protected function filter_sanitize_string($value, $params = null)
     {
-        return filter_var($value, FILTER_SANITIZE_STRING);
+        return str_replace("\0", '', strip_tags((string) $value));
     }
 
     /**
