@@ -6,6 +6,9 @@ if(isset($_GET['n'])) {
 	$getchar = $mysqli->real_escape_string($_GET['n']);
 	$c = $mysqli->query("SELECT * from characters WHERE name = '".$getchar."'")->fetch_assoc();
 	if($c) {
+		$jobId = (int) $c['job'];
+		$jobNames = getJobNames(false);
+		$jobName = $jobNames[$jobId] ?? "Unknown (ID {$jobId})";
 		echo "
 			<h2 class=\"text-left\">Character Info</h2><hr/>
 			<div class=\"row\">
@@ -17,7 +20,7 @@ if(isset($_GET['n'])) {
 								<img src=\"".$siteurl."assets/img/GD/create.php?name=".$c['name']."\" alt=\"".$c['name']."\" img-fluid\">
 							</div>
 							<hr/>
-							<b>Job:</b> " . $c['job'] . "<br/>
+							<b>Job:</b> " . htmlspecialchars($jobName, ENT_QUOTES, 'UTF-8') . "<br/>
 		";
 		if($servertype == 1) {
 			echo "<b>Rebirths:</b> " . $c['reborns'] . "<br/>";

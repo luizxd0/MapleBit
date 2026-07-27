@@ -4,12 +4,15 @@ if(basename($_SERVER["PHP_SELF"]) == "characters.php") {
 }
 
 if(isset($_SESSION['id'])) {
+	$jobNames = getJobNames(false);
 	$checkchar = $mysqli->query("SELECT * from characters WHERE accountid = '".$_SESSION['id']."'");
 	$countchar = $checkchar->num_rows;
 	if($countchar > 0) {
 		echo "<h2 class=\"text-left\">My Characters</h2><hr/>";
 		$i = 0;
 		while($c = $checkchar->fetch_assoc()) {
+			$jobId = (int) $c['job'];
+			$jobName = $jobNames[$jobId] ?? "Unknown (ID {$jobId})";
 			if($i % 3 == 0) {
 				echo "<div class=\"row\">";
 			}
@@ -22,7 +25,7 @@ if(isset($_SESSION['id'])) {
 									<img src=\"".$siteurl."assets/img/GD/create.php?name=".$c['name']."\" alt=\"".$c['name']."\" img-fluid\">
 								</div>
 								<hr/>
-								<b>Job:</b> " . $c['job'] . "<br/>
+								<b>Job:</b> " . htmlspecialchars($jobName, ENT_QUOTES, 'UTF-8') . "<br/>
 			";
 			if($servertype == 1) {
 				echo "<b>Rebirths:</b> " . $c['reborns'] . "<br/>";
