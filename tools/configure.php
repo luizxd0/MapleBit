@@ -72,6 +72,50 @@ $update->bind_param(
 );
 $update->execute();
 
+$transactionalTables = [
+    $prefix . 'vote',
+    $prefix . 'votingrecords',
+];
+foreach ($transactionalTables as $table) {
+    if (!preg_match('/^[A-Za-z0-9_]+$/', $table)) {
+        throw new RuntimeException("Unsafe table name '{$table}'.");
+    }
+    $engineStatement = $mysqli->prepare(
+        'SELECT ENGINE FROM information_schema.tables '
+        . 'WHERE table_schema = DATABASE() AND table_name = ?'
+    );
+    $engineStatement->bind_param('s', $table);
+    $engineStatement->execute();
+    $engine = $engineStatement->get_result()->fetch_assoc()['ENGINE'] ?? null;
+    if ($engine !== null && strcasecmp($engine, 'InnoDB') !== 0) {
+        $mysqli->query("ALTER TABLE `{$table}` ENGINE=InnoDB");
+    }
+}
+
+$voteSiteCount = (int) $mysqli->query(
+    "SELECT COUNT(*) AS total FROM {$prefix}vote"
+)->fetch_assoc()['total'];
+if ($voteSiteCount === 0 && getenv('MAPLE_LOCAL_DEV') === '1') {
+    $localVoteName = 'Local test vote';
+    $localVoteLink = rtrim($siteUrl, '/') . '/?base=main&page=home&vote_test=complete';
+    $localVoteNx = 1000;
+    $localVotePoints = 1;
+    $localVoteWait = 3600;
+    $insertVoteSite = $mysqli->prepare(
+        "INSERT INTO {$prefix}vote (name, link, gnx, gvp, waittime) VALUES (?, ?, ?, ?, ?)"
+    );
+    $insertVoteSite->bind_param(
+        'ssiii',
+        $localVoteName,
+        $localVoteLink,
+        $localVoteNx,
+        $localVotePoints,
+        $localVoteWait
+    );
+    $insertVoteSite->execute();
+    $voteSiteCount = 1;
+}
+
 $packageCount = (int) $mysqli->query(
     "SELECT COUNT(*) AS total FROM {$prefix}buynx"
 )->fetch_assoc()['total'];
@@ -105,4 +149,5 @@ echo "MapleWeb configured successfully.\n";
 echo "Database: {$host['database']} on {$host['hostname']}:{$host['port']}\n";
 echo "Accounts: {$counts['accounts']}; Characters: {$counts['characters']}\n";
 echo "NX packages: {$packageCount}\n";
+echo "Vote sites: {$voteSiteCount}\n";
 

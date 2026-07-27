@@ -1,91 +1,221 @@
 <?php
-if(basename($_SERVER["PHP_SELF"]) == "vote.php") {
-	die("403 - Access Forbidden");
-}
-echo "<h2 class=\"text-left\">Vote</h2><hr/>";
-$earnedpoints = false;
-$insertnew = false;
-$time = time();
-$redirect = "";
-$account = $mysqli->real_escape_string(preg_replace("/[^A-Za-z0-9 ]/", '', @$_POST['name']));
-$siteid = $mysqli->real_escape_string(@$_POST['votingsite']);
-$checkacc = $mysqli->query("SELECT * FROM accounts WHERE name = '$account'");
-$countcheckacc = $checkacc->num_rows;
-$row = $checkacc->fetch_assoc();
-if($countcheckacc == 0 && isset($_POST['submit'])) { $funct_error =  "This account doesn't exist!";}
-if($row['loggedin'] > 0 && isset($_POST['submit'])) { $funct_error =  "This account is logged in!";}
-elseif ($account == '' && isset($_POST['submit'])) {$funct_error = 'You need to put in a username!';}
-elseif(empty($_POST['votingsite']) && isset($_POST['submit'])){
-	$funct_error = "Please select a voting site";
-}
-elseif(isset($_POST['submit'])) {
-   	$checksite = $mysqli->query("SELECT * FROM ".$prefix."vote WHERE id = ".$siteid."");
-	$countchecksite = $checksite->num_rows;
-	if($countchecksite == 0 && isset($_POST['submit'])) {
-		$funct_error = "Invalid voting site.";
-	}
-	else {
-        $result = $mysqli->query("SELECT *, SUM(times) as amount FROM ".$prefix."votingrecords WHERE NOT account='' AND NOT account='0' AND account='".$account."' AND siteid = '".$siteid."'") or die('Error - Could not look up vote record!');
-        $row = $result->fetch_assoc();
-		$sitequery = $mysqli->query("SELECT * FROM ".$prefix."vote WHERE id = '".$siteid."'");
-		$vsite = $sitequery->fetch_assoc();
-		$gvp = $vsite['gvp'];
-		$gnx = $vsite['gnx'];
-        $timecalc = $time - $row['date'];
-        if ($row['amount'] == '' || $timecalc > $vsite['waittime']) {
-            if($row['amount'] == '') {
-                $result = $mysqli->query("INSERT INTO ".$prefix."votingrecords (siteid, ip, account, date, times) VALUES ('".$siteid."', '".$ipaddress."', '".$account."', '".$time."', '1')") or die ('Error - Could not insert vote records!');
-            }
-            else {
-                $result = $mysqli->query("UPDATE ".$prefix."votingrecords SET siteid = '".$siteid."', ip='".$ipaddress."', account='".$account."', date='".$time."', times='1' WHERE account='".$account."' AND siteid = '".$siteid."'") or die ('Error - Could not update vote records!');
-            }
-            $earnedpoints = true;
-            if ($earnedpoints == true) {
-                if ($account != '') {$result = $mysqli->query("UPDATE accounts SET $colvp = $colvp + $gvp, $colnx = $colnx + $gnx WHERE name='".$account."'") or die ('Error - Could not give rewards. Your site administrator needs to configure the NX and VP settings.');}
-				$funct_msg = '<meta http-equiv="refresh" content="0; url='.$vsite['link'].'">';
-                $redirect = true;
-            }
-        }
-        elseif($timecalc < $vsite['waittime'] && $row['amount'] != '') {
-            $funct_msg = 'You\'ve already voted for '.$vsite['name'].' within the last '.round($vsite['waittime']/3600).' hours!';
-            $funct_msg .= '<br />Vote time: '. date('M d\, h:i A', $row['date']);
-        }
-        else {
-            $funct_error = 'Unknown Error';
-        }
-   	}
+if (basename($_SERVER['PHP_SELF']) === 'vote.php') {
+    http_response_code(403);
+    exit('403 - Access Forbidden');
 }
 
-if($redirect == true) {
-	echo $funct_msg;
+$escape = static fn ($value): string => htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
+$message = '';
+$voteDestination = null;
+$accountId = isset($_SESSION['id']) ? (int) $_SESSION['id'] : 0;
+$accountName = isset($_SESSION['name']) ? (string) $_SESSION['name'] : '';
+$selectedSiteId = filter_var($_POST['votingsite'] ?? null, FILTER_VALIDATE_INT);
+$validNxColumns = ['nxCredit', 'maplePoint', 'nxPrepaid'];
+$validVpColumns = ['votepoints'];
+
+if (isset($_POST['submit'])) {
+    $csrfToken = (string) ($_POST['csrf_token'] ?? '');
+
+    if (!$accountId) {
+        $message = '<div class="alert alert-danger">Sign in before voting so rewards reach the correct account.</div>';
+    } elseif (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $csrfToken)) {
+        $message = '<div class="alert alert-danger">Your form expired. Reload the page and try again.</div>';
+    } elseif (!$selectedSiteId) {
+        $message = '<div class="alert alert-danger">Choose a voting site.</div>';
+    } elseif (!in_array($colnx, $validNxColumns, true) || !in_array($colvp, $validVpColumns, true)) {
+        $message = '<div class="alert alert-danger">Vote rewards are not configured for this server.</div>';
+    } else {
+        try {
+            $mysqli->begin_transaction();
+
+            $accountStatement = $mysqli->prepare(
+                'SELECT id, name, loggedin FROM accounts WHERE id = ? FOR UPDATE'
+            );
+            $accountStatement->bind_param('i', $accountId);
+            $accountStatement->execute();
+            $account = $accountStatement->get_result()->fetch_assoc();
+            if (!$account) {
+                throw new RuntimeException('Your account could not be found.');
+            }
+            if ((int) $account['loggedin'] > 0) {
+                throw new RuntimeException('Log out of the game before collecting vote rewards.');
+            }
+
+            $siteStatement = $mysqli->prepare(
+                "SELECT id, name, link, gnx, gvp, waittime FROM {$prefix}vote WHERE id = ? FOR UPDATE"
+            );
+            $siteStatement->bind_param('i', $selectedSiteId);
+            $siteStatement->execute();
+            $site = $siteStatement->get_result()->fetch_assoc();
+            if (!$site) {
+                throw new RuntimeException('That voting site is no longer available.');
+            }
+
+            $recordStatement = $mysqli->prepare(
+                "SELECT id, date FROM {$prefix}votingrecords "
+                . 'WHERE account = ? AND siteid = ? ORDER BY date DESC LIMIT 1 FOR UPDATE'
+            );
+            $recordStatement->bind_param('si', $accountName, $selectedSiteId);
+            $recordStatement->execute();
+            $record = $recordStatement->get_result()->fetch_assoc();
+
+            $now = time();
+            $waitTime = max(0, (int) $site['waittime']);
+            $nextVoteAt = $record ? (int) $record['date'] + $waitTime : 0;
+            if ($record && $now < $nextVoteAt) {
+                $remaining = $nextVoteAt - $now;
+                $hours = intdiv($remaining, 3600);
+                $minutes = max(1, (int) ceil(($remaining % 3600) / 60));
+                throw new RuntimeException(
+                    'You can vote on ' . $site['name'] . ' again in '
+                    . ($hours > 0 ? $hours . 'h ' : '') . $minutes . 'm.'
+                );
+            }
+
+            if ($record) {
+                $updateRecord = $mysqli->prepare(
+                    "UPDATE {$prefix}votingrecords SET ip = ?, date = ?, times = times + 1 WHERE id = ?"
+                );
+                $recordId = (int) $record['id'];
+                $updateRecord->bind_param('sii', $ipaddress, $now, $recordId);
+                $updateRecord->execute();
+            } else {
+                $insertRecord = $mysqli->prepare(
+                    "INSERT INTO {$prefix}votingrecords (siteid, ip, account, date, times) "
+                    . 'VALUES (?, ?, ?, ?, 1)'
+                );
+                $insertRecord->bind_param('issi', $selectedSiteId, $ipaddress, $accountName, $now);
+                $insertRecord->execute();
+            }
+
+            $nxReward = max(0, (int) $site['gnx']);
+            $vpReward = max(0, (int) $site['gvp']);
+            $rewardStatement = $mysqli->prepare(
+                "UPDATE accounts SET {$colvp} = {$colvp} + ?, {$colnx} = {$colnx} + ? WHERE id = ?"
+            );
+            $rewardStatement->bind_param('iii', $vpReward, $nxReward, $accountId);
+            $rewardStatement->execute();
+            $mysqli->commit();
+
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+            $voteDestination = (string) $site['link'];
+            $message = '<div class="alert alert-success"><strong>Reward added!</strong> '
+                . number_format($nxReward) . ' NX and ' . number_format($vpReward)
+                . ' vote point' . ($vpReward === 1 ? '' : 's')
+                . ' were credited to ' . $escape($accountName) . '.</div>';
+        } catch (Throwable $error) {
+            $mysqli->rollback();
+            $message = '<div class="alert alert-danger">'
+                . $escape($error->getMessage()) . '</div>';
+        }
+    }
 }
-else {
-	if(isset($funct_msg)) {echo '<div class="alert alert-danger">'.$funct_msg.'</div>';}
-	if(isset($funct_error)) {echo '<div class="alert alert-danger">'.$funct_error.'</div>';}
-	$query = $mysqli->query("SELECT * from ".$prefix."vote");
-	if($query->num_rows == 0){
-		echo "<div class=\"alert alert-danger\">Your administrator has not added any voting sites yet!</div>";
-	}
-	else {
-		echo "
-		<form method=\"post\">
-		<div class=\"form-group\">
-		<label for=\"voteSite\">Select Site:</label>
-		<select name=\"votingsite\" class=\"form-control\" id=\"voteSite\" required>
-		<option value=\"\" disabled selected>Select Site...</option>";
-		while($row = $query->fetch_assoc()){
-			echo "<option value=\"".$row['id']."\">".$row['name']."</option>";
-		}
-		echo "</select>
-		</div>";
-		if(!isset($_SESSION['id'])) {
-			echo "<input type=\"text\" name=\"name\" maxlength=\"15\" class=\"form-control\" placeholder=\"Username\" required autocomplete=\"off\"/><br/>";
-		} else {
-			echo "<input type=\"text\" name=\"name\" maxlength=\"15\" class=\"form-control\" placeholder=\"".$_SESSION['name']."\" value=\"".$_SESSION['name']."\" required autocomplete=\"off\"/><br/>";
-		}
-		echo "
-			<input type=\"submit\" name=\"submit\" value=\"Submit &raquo;\" class=\"btn btn-primary\"/>
-			</form>
-		";
-	}
+
+$sitesResult = $mysqli->query(
+    "SELECT id, name, link, gnx, gvp, waittime FROM {$prefix}vote ORDER BY name"
+);
+$voteSites = $sitesResult ? $sitesResult->fetch_all(MYSQLI_ASSOC) : [];
+
+$lastVotes = [];
+if ($accountId && $voteSites) {
+    $lastVoteStatement = $mysqli->prepare(
+        "SELECT siteid, MAX(date) AS last_vote FROM {$prefix}votingrecords WHERE account = ? GROUP BY siteid"
+    );
+    $lastVoteStatement->bind_param('s', $accountName);
+    $lastVoteStatement->execute();
+    foreach ($lastVoteStatement->get_result()->fetch_all(MYSQLI_ASSOC) as $lastVote) {
+        $lastVotes[(int) $lastVote['siteid']] = (int) $lastVote['last_vote'];
+    }
 }
+
+$availableSiteIds = [];
+$currentTime = time();
+foreach ($voteSites as $site) {
+    $siteId = (int) $site['id'];
+    $lastVoteAt = $lastVotes[$siteId] ?? 0;
+    if (!$lastVoteAt || $currentTime >= $lastVoteAt + (int) $site['waittime']) {
+        $availableSiteIds[] = $siteId;
+    }
+}
+$defaultSiteId = in_array($selectedSiteId, $availableSiteIds, true)
+    ? $selectedSiteId
+    : ($availableSiteIds[0] ?? 0);
+?>
+<div class="vote-heading">
+    <div>
+        <span>Support the world</span>
+        <h2 class="text-left">Vote &amp; earn rewards</h2>
+        <p>Help SoloMapling get noticed and collect a small thank-you for your account.</p>
+    </div>
+    <span class="vote-gift"><i class="fa fa-gift" aria-hidden="true"></i></span>
+</div>
+
+<?php echo $message; ?>
+
+<?php if ($voteDestination !== null): ?>
+    <div class="vote-success-action">
+        <a class="btn maple-btn-primary" href="<?php echo $escape($voteDestination); ?>"
+           rel="noopener noreferrer">
+            Continue to voting site <i class="fa fa-external-link" aria-hidden="true"></i>
+        </a>
+        <small>Your reward has already been recorded; the site cooldown now applies.</small>
+    </div>
+<?php elseif (!$voteSites): ?>
+    <div class="vote-empty">
+        <span><i class="fa fa-flag-o" aria-hidden="true"></i></span>
+        <h3>Voting is not configured yet</h3>
+        <p>An administrator can add a server-listing URL from Admin Panel → Vote Configuration.</p>
+    </div>
+<?php elseif (!$accountId): ?>
+    <div class="vote-empty">
+        <span><i class="fa fa-user-circle-o" aria-hidden="true"></i></span>
+        <h3>Sign in to vote</h3>
+        <p>Use the account panel on this page, then choose a voting site to collect rewards securely.</p>
+    </div>
+<?php else: ?>
+    <form method="post" class="vote-form">
+        <input type="hidden" name="csrf_token" value="<?php echo $escape($_SESSION['csrf_token']); ?>">
+        <div class="vote-site-grid">
+            <?php foreach ($voteSites as $site): ?>
+                <?php
+                $siteId = (int) $site['id'];
+                $lastVoteAt = $lastVotes[$siteId] ?? 0;
+                $availableAt = $lastVoteAt + (int) $site['waittime'];
+                $available = in_array($siteId, $availableSiteIds, true);
+                ?>
+                <label class="vote-site-card <?php echo $available ? '' : 'on-cooldown'; ?>">
+                    <input type="radio" name="votingsite" value="<?php echo $siteId; ?>"
+                        <?php echo $defaultSiteId === $siteId ? 'checked' : ''; ?>
+                        <?php echo $available ? '' : 'disabled'; ?>>
+                    <span class="vote-radio"><i class="fa fa-check" aria-hidden="true"></i></span>
+                    <span class="vote-site-copy">
+                        <small><?php echo $available ? 'Ready to vote' : 'Cooldown active'; ?></small>
+                        <strong><?php echo $escape($site['name']); ?></strong>
+                        <em>
+                            <?php echo number_format((int) $site['gnx']); ?> NX ·
+                            <?php echo number_format((int) $site['gvp']); ?> VP
+                        </em>
+                    </span>
+                    <span class="vote-timer">
+                        <?php if ($available): ?>
+                            Every <?php echo max(1, round((int) $site['waittime'] / 3600)); ?>h
+                        <?php else: ?>
+                            <?php echo date('H:i', $availableAt); ?>
+                        <?php endif; ?>
+                    </span>
+                </label>
+            <?php endforeach; ?>
+        </div>
+        <div class="vote-submit-row">
+            <div>
+                <strong>Voting as <?php echo $escape($accountName); ?></strong>
+                <small>You must be logged out of the game.</small>
+            </div>
+            <button type="submit" name="submit" class="btn maple-btn-primary"
+                    <?php echo $availableSiteIds ? '' : 'disabled'; ?>>
+                <?php echo $availableSiteIds ? 'Claim reward &amp; vote' : 'All sites on cooldown'; ?>
+                <i class="fa fa-angle-right" aria-hidden="true"></i>
+            </button>
+        </div>
+    </form>
+<?php endif; ?>

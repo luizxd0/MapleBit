@@ -257,7 +257,7 @@ CREATE TABLE `".$prefix."vote` (
 `gvp` INT(11) UNSIGNED NOT NULL DEFAULT 1,
 `waittime` INT(11) UNSIGNED NOT NULL DEFAULT 21600,
 PRIMARY KEY ( `id` )
-) ENGINE = MYISAM ;
+) ENGINE = InnoDB ;
 
 DROP TABLE IF EXISTS `".$prefix."ncomments`;
  CREATE TABLE `".$prefix."ncomments` (
@@ -364,7 +364,7 @@ CREATE TABLE `".$prefix."votingrecords` (
   `date` int(11) NOT NULL DEFAULT '0',
   `times` bigint(20) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`)
-) ENGINE=MYISAM;"
+) ENGINE=InnoDB;"
 );
 echo "<META http-equiv=\"refresh\" content=\"0;URL=?install=4\">";
 		break;
